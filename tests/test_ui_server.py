@@ -127,3 +127,4 @@ def test_ui_api_phases_and_custom_probe(ui_test_server):
     vic_data = r_vic.json()
     assert vic_data["is_poisoned"] is True
     assert vic_data["cache_status"] == "HIT"
+

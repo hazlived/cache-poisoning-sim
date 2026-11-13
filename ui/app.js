@@ -1,7 +1,7 @@
 /**
  * Web Cache Poisoning Laboratory Client Application
- * Handles API communication, scenario stepping, interactive probes,
- * and live cache telemetry visualization.
+ * Neo-Brutalist interactive console with live attack flow animations,
+ * scenario stepping, interactive probes, and real-time telemetry.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,10 +9,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const state = {
     currentPhase: 1,
     mode: 'vulnerable',
+    isAnimating: false,
     autoRefreshInterval: null,
   };
 
-  // DOM Elements
+  // DOM Elements: Top Navigation & Status
   const elStatusProxy = document.getElementById('status-proxy');
   const elStatusUpstream = document.getElementById('status-upstream');
   const elStatusAttacker = document.getElementById('status-attacker');
@@ -21,10 +22,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const elBtnPurgeCache = document.getElementById('btn-purge-cache');
   const elUpstreamModeTag = document.getElementById('upstream-mode-tag');
 
+  // Telemetry Metrics
   const elMetricHits = document.getElementById('metric-hits');
   const elMetricMisses = document.getElementById('metric-misses');
   const elMetricKeys = document.getElementById('metric-keys');
 
+  // Animation & Topology Pipeline Elements
+  const elAnimationTicker = document.getElementById('animation-ticker');
+  const elBtnPlayAnimation = document.getElementById('btn-play-animation');
+  const elBtnResetAnimation = document.getElementById('btn-reset-animation');
+  const elNodeClient = document.getElementById('node-client');
+  const elNodeProxy = document.getElementById('node-proxy');
+  const elNodeUpstream = document.getElementById('node-upstream');
+  const elNodeAttacker = document.getElementById('node-attacker');
+  const elArrowClientProxy = document.getElementById('arrow-client-proxy');
+  const elArrowProxyUpstream = document.getElementById('arrow-proxy-upstream');
+
+  // Scenario Stepper Elements
   const elPhaseButtons = document.querySelectorAll('.btn-phase');
   const elPhaseContextTitle = document.getElementById('phase-context-title');
   const elPhaseContextDesc = document.getElementById('phase-context-desc');
@@ -33,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const elTelemetryLog = document.getElementById('telemetry-log-container');
   const elBtnClearLogs = document.getElementById('btn-clear-logs');
 
+  // Interactive Workbench Form & Result Elements
   const elWorkbenchForm = document.getElementById('workbench-form');
   const elReqMethod = document.getElementById('req-method');
   const elReqPath = document.getElementById('req-path');
@@ -46,13 +61,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const elProbeVerdictText = document.getElementById('probe-verdict-text');
   const elProbeRawHeaders = document.getElementById('probe-raw-headers');
 
+  // Cache Table & Simulated Viewport
   const elCacheTableBody = document.getElementById('cache-table-body');
   const elBtnRefreshCache = document.getElementById('btn-refresh-cache');
   const elBtnRefreshView = document.getElementById('btn-refresh-view');
   const elBrowserContentArea = document.getElementById('browser-content-area');
   const elClientScriptVal = document.getElementById('client-script-val');
 
-  // Phase Metadata Dictionary
+  // Phase Descriptions
   const phases = {
     1: {
       title: 'Phase 1: Baseline Traffic Analysis',
@@ -72,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
   };
 
-  // Initial Load
+  // Initialization
   init();
 
   function init() {
@@ -81,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchCacheEntries();
     simulateVictimView();
 
-    // Periodic telemetry polling every 4 seconds
+    // Auto-refresh metrics every 4 seconds
     state.autoRefreshInterval = setInterval(() => {
       fetchStatus(true);
       fetchCacheEntries(true);
@@ -94,6 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Purge cache
     elBtnPurgeCache.addEventListener('click', purgeCache);
+
+    // Animation controls
+    elBtnPlayAnimation.addEventListener('click', playFullAttackAnimation);
+    elBtnResetAnimation.addEventListener('click', resetAnimationFlow);
 
     // Phase selector tabs
     elPhaseButtons.forEach((btn) => {
@@ -140,19 +160,100 @@ document.addEventListener('DOMContentLoaded', () => {
     elPhaseContextDesc.textContent = phases[phaseNum].desc;
   }
 
-  // API: Fetch Cluster & Cache Status
+  // =========================================================================
+  // ANIMATION ENGINE: SIMULATES THE ATTACK FLOW ACROSS NODES
+  // =========================================================================
+
+  function clearNodeHighlights() {
+    [elNodeClient, elNodeProxy, elNodeUpstream, elNodeAttacker].forEach((n) => {
+      n.classList.remove('active-packet', 'active-poison', 'active-safe');
+    });
+    elArrowClientProxy.classList.remove('flow-active', 'flow-poison');
+    elArrowProxyUpstream.classList.remove('flow-active', 'flow-poison');
+  }
+
+  function resetAnimationFlow() {
+    clearNodeHighlights();
+    elAnimationTicker.textContent = 'Pipeline reset to idle state. Ready for simulation.';
+    purgeCache();
+  }
+
+  async function playFullAttackAnimation() {
+    if (state.isAnimating) return;
+    state.isAnimating = true;
+    elBtnPlayAnimation.disabled = true;
+
+    try {
+      // Step 1: Preparation & Cache Purge
+      elAnimationTicker.textContent = '[STEP 1/5] Purging Edge Proxy cache to simulate cache miss window...';
+      await purgeCache();
+      clearNodeHighlights();
+      await delay(800);
+
+      // Step 2: Attacker crafts unkeyed request
+      elNodeClient.classList.add('active-poison');
+      elAnimationTicker.textContent = '[STEP 2/5] Attacker Mallory dispatches HTTP GET / with header: X-Forwarded-Host: 127.0.0.1:8882';
+      elArrowClientProxy.classList.add('flow-poison');
+      await delay(1000);
+
+      // Step 3: Edge Proxy evaluates request key
+      elNodeClient.classList.remove('active-poison');
+      elNodeProxy.classList.add('active-packet');
+      elAnimationTicker.textContent = '[STEP 3/5] Edge Proxy computes Cache Key: [GET:portal:8880:/]. Unkeyed header ignored! Cache MISS. Forwarding upstream...';
+      elArrowProxyUpstream.classList.add('flow-poison');
+      await delay(1200);
+
+      // Step 4: Upstream dynamically reflects the host
+      elNodeProxy.classList.remove('active-packet');
+      elNodeUpstream.classList.add('active-poison');
+      elAnimationTicker.textContent = '[STEP 4/5] Upstream App reflects attacker host into HTML: <script src="http://127.0.0.1:8882/static/app.js">';
+      await delay(1200);
+
+      // Step 5: Poisoned response stored in Edge Cache under clean key
+      // Execute the actual Phase 2 request on backend
+      await runPhase(2, true);
+      elNodeUpstream.classList.remove('active-poison');
+      elNodeProxy.classList.add('active-poison');
+      elAnimationTicker.textContent = '[STEP 5/5] CRITICAL: Edge Proxy stores poisoned HTML under clean key! TTL: 30s. Now testing victim visit...';
+      await delay(1400);
+
+      // Step 6: Innocent victim Charlie visits
+      clearNodeHighlights();
+      elNodeClient.classList.add('active-packet');
+      elArrowClientProxy.classList.add('flow-active');
+      elAnimationTicker.textContent = '[EXPLOITATION] Innocent trader Charlie requests GET / with NO malicious headers. Proxy serves Cache HIT!';
+      await delay(1000);
+
+      // Step 7: Victim executes hostile canary script
+      await runPhase(3, true);
+      elNodeProxy.classList.add('active-poison');
+      elNodeAttacker.classList.add('active-poison');
+      elAnimationTicker.textContent = '[EXPLOIT SUCCESSFUL] Victim browser executed script from Attacker Origin (:8882). Staged XSS confirmed!';
+      await simulateVictimView();
+    } finally {
+      state.isAnimating = false;
+      elBtnPlayAnimation.disabled = false;
+    }
+  }
+
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // =========================================================================
+  // API CLIENT & STATUS HANDLERS
+  // =========================================================================
+
   async function fetchStatus(isBackground = false) {
     try {
       const res = await fetch('/api/status');
-      if (!res.ok) throw new Error('Status endpoint failure');
+      if (!res.ok) throw new Error('Status failure');
       const data = await res.json();
 
-      // Update Node Indicators
       updateNodeStatus(elStatusProxy, data.proxy_online);
       updateNodeStatus(elStatusUpstream, data.upstream_online);
       updateNodeStatus(elStatusAttacker, data.attacker_online);
 
-      // Update Mode Badge
       state.mode = data.mode;
       const isHardened = data.mode === 'hardened';
       elModeBadge.classList.toggle('hardened', isHardened);
@@ -160,7 +261,6 @@ document.addEventListener('DOMContentLoaded', () => {
       elUpstreamModeTag.textContent = isHardened ? 'Hardened: Canonical Host' : 'Vulnerable: Dynamic Host';
       elUpstreamModeTag.classList.toggle('unkeyed-tag', !isHardened);
 
-      // Update Metrics
       if (data.cache_stats) {
         elMetricHits.textContent = data.cache_stats.hits ?? 0;
         elMetricMisses.textContent = data.cache_stats.misses ?? 0;
@@ -168,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch (err) {
       if (!isBackground) {
-        console.error('Failed to fetch status:', err);
+        console.error('Status fetch error:', err);
       }
     }
   }
@@ -180,7 +280,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // API: Toggle Hardening Mode
   async function toggleHardeningMode() {
     try {
       const newMode = state.mode === 'vulnerable' ? 'hardened' : 'vulnerable';
@@ -189,32 +288,33 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode: newMode }),
       });
-      const data = await res.json();
-      fetchStatus();
-      fetchCacheEntries();
-      simulateVictimView();
+      await res.json();
+      await fetchStatus();
+      await fetchCacheEntries();
+      await simulateVictimView();
     } catch (err) {
-      alert('Failed to switch operational mode: ' + err.message);
+      alert('Mode toggle failed: ' + err.message);
     }
   }
 
-  // API: Purge Cache
   async function purgeCache() {
     try {
       const res = await fetch('/api/cache/purge', { method: 'POST' });
-      const data = await res.json();
-      fetchStatus();
-      fetchCacheEntries();
-      simulateVictimView();
+      await res.json();
+      await fetchStatus();
+      await fetchCacheEntries();
+      await simulateVictimView();
     } catch (err) {
-      alert('Failed to purge cache: ' + err.message);
+      alert('Purge failed: ' + err.message);
     }
   }
 
-  // API: Run Single Phase
-  async function runPhase(phaseNum) {
-    elBtnRunCurrentPhase.disabled = true;
-    elBtnRunCurrentPhase.querySelector('span').textContent = 'Executing...';
+  // Run Phase
+  async function runPhase(phaseNum, silent = false) {
+    if (!silent) {
+      elBtnRunCurrentPhase.disabled = true;
+      elBtnRunCurrentPhase.querySelector('span').textContent = 'Executing...';
+    }
 
     try {
       const res = await fetch(`/api/phase/${phaseNum}`, { method: 'POST' });
@@ -224,9 +324,9 @@ document.addEventListener('DOMContentLoaded', () => {
         data.transactions.forEach((tx) => appendLogEntry(tx));
       }
 
-      fetchStatus();
-      fetchCacheEntries();
-      simulateVictimView();
+      await fetchStatus();
+      await fetchCacheEntries();
+      await simulateVictimView();
     } catch (err) {
       appendLogEntry({
         actor: 'Simulation Engine',
@@ -236,15 +336,16 @@ document.addEventListener('DOMContentLoaded', () => {
         verdict_type: 'poisoned',
       });
     } finally {
-      elBtnRunCurrentPhase.disabled = false;
-      elBtnRunCurrentPhase.querySelector('span').textContent = 'Execute Selected Phase';
+      if (!silent) {
+        elBtnRunCurrentPhase.disabled = false;
+        elBtnRunCurrentPhase.querySelector('span').textContent = 'Execute Selected Phase';
+      }
     }
   }
 
-  // API: Run All Phases
   async function runAllPhases() {
     elBtnRunAll.disabled = true;
-    elBtnRunAll.querySelector('span').textContent = 'Running All Phases...';
+    elBtnRunAll.querySelector('span').textContent = 'Executing 4 Phases...';
 
     try {
       const res = await fetch('/api/run-all', { method: 'POST' });
@@ -254,9 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
         data.transactions.forEach((tx) => appendLogEntry(tx));
       }
 
-      fetchStatus();
-      fetchCacheEntries();
-      simulateVictimView();
+      await fetchStatus();
+      await fetchCacheEntries();
+      await simulateVictimView();
+      elAnimationTicker.textContent = 'All 4 phases completed. Hardened mode active and verified safe.';
     } catch (err) {
       alert('Execution failure: ' + err.message);
     } finally {
@@ -265,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Render Telemetry Log Entry
+  // Render Log
   function appendLogEntry(tx) {
     const emptyState = elTelemetryLog.querySelector('.log-empty-state');
     if (emptyState) {
@@ -318,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // API: Interactive Workbench Submit
+  // Workbench Probe Submit
   async function handleWorkbenchSubmit(e) {
     e.preventDefault();
 
@@ -340,7 +442,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const startTime = performance.now();
     elProbeVerdictBox.className = 'security-verdict';
-    elProbeVerdictText.textContent = 'Dispatching probe...';
+    elProbeVerdictText.textContent = 'Dispatching probe to Edge Proxy (:8880)...';
+
+    // Animate flow arrow
+    elArrowClientProxy.classList.add('flow-active');
 
     try {
       const res = await fetch('/api/custom-request', {
@@ -351,7 +456,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       const duration = Math.round(performance.now() - startTime);
 
-      // Render Response Analysis
       elProbeResStatus.textContent = `${data.status_code} OK`;
       elProbeResTime.textContent = `${duration} ms`;
       elProbeResKey.textContent = data.cache_key || 'N/A';
@@ -361,22 +465,23 @@ document.addEventListener('DOMContentLoaded', () => {
       elProbeBadgeCache.className = `badge ${isHit ? 'badge-hit' : 'badge-miss'}`;
       elProbeBadgeCache.textContent = `Cache: ${data.cache_status || 'MISS'}`;
 
-      // Verdict styling
       const isPoisoned = data.is_poisoned;
       const isCspActive = data.csp_present;
 
       if (isPoisoned) {
         elProbeVerdictBox.className = 'security-verdict poisoned';
         elProbeVerdictText.textContent = 'CRITICAL: Edge cache stored or served poisoned HTML pointing to attacker origin (:8882).';
+        elNodeProxy.classList.add('active-poison');
       } else if (isCspActive) {
         elProbeVerdictBox.className = 'security-verdict blocked';
         elProbeVerdictText.textContent = 'PROTECTED: Canonical script origin enforced and guarded by Content-Security-Policy.';
+        elNodeProxy.classList.add('active-safe');
       } else {
         elProbeVerdictBox.className = 'security-verdict safe';
         elProbeVerdictText.textContent = 'SAFE: Response references authentic corporate application assets.';
+        elNodeProxy.classList.add('active-safe');
       }
 
-      // Raw headers
       let rawText = `HTTP/1.1 ${data.status_code} OK\n`;
       if (data.response_headers) {
         Object.entries(data.response_headers).forEach(([k, v]) => {
@@ -388,20 +493,24 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       elProbeRawHeaders.textContent = rawText;
 
-      fetchStatus();
-      fetchCacheEntries();
-      simulateVictimView();
+      await fetchStatus();
+      await fetchCacheEntries();
+      await simulateVictimView();
     } catch (err) {
       elProbeVerdictBox.className = 'security-verdict poisoned';
       elProbeVerdictText.textContent = 'Request error: ' + err.message;
+    } finally {
+      setTimeout(() => {
+        elArrowClientProxy.classList.remove('flow-active');
+      }, 1000);
     }
   }
 
-  // API: Fetch Cache Store Entries
+  // Cache Table
   async function fetchCacheEntries(isBackground = false) {
     try {
       const res = await fetch('/api/cache/entries');
-      if (!res.ok) throw new Error('Cache entries failure');
+      if (!res.ok) throw new Error('Cache entries error');
       const data = await res.json();
 
       elCacheTableBody.innerHTML = '';
@@ -435,7 +544,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // API: Simulate Innocent Victim Browser View
+  // Simulate Victim View
   async function simulateVictimView() {
     try {
       const res = await fetch('/api/simulate-victim');
@@ -456,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
         elBrowserContentArea.prepend(alertBanner);
         elClientScriptVal.style.color = '#dc2626';
       } else {
-        elClientScriptVal.style.color = '#0284c7';
+        elClientScriptVal.style.color = '#2563eb';
       }
     } catch (err) {
       console.error('Victim view error:', err);
