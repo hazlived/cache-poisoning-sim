@@ -1,5 +1,17 @@
 # Web Cache Poisoning Attack Simulation and Defense Framework
 
+## Browser interface
+
+Run the interactive local interface with:
+
+```bash
+python web_ui.py
+```
+
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). Start individual phases or run the full sequence. The three simulated services start on loopback ports 8880–8882 when the first phase runs. Use **Reset** to stop them and clear the displayed results. Press Ctrl+C in the terminal to shut down the interface.
+
+The original terminal walkthrough remains available with `python run_simulation.py`.
+
 **A Research-Grade, Reproducible Security Simulation of an Unkeyed Header Injection Vulnerability (CVSS 8.6)**
 
 ---
@@ -242,15 +254,27 @@ Install the project dependencies from [`requirements.txt`](file:///c:/Users/hazi
 pip install -r requirements.txt
 ```
 
-### 7.2 Running the Interactive Visual Simulation
+### 7.2 Running the Web-Based Interactive UI Console
+To launch the interactive laboratory web dashboard:
+
+```powershell
+python ui_server.py
+```
+Open a browser and navigate to `http://127.0.0.1:8888/` to access the full graphical control center featuring real-time node telemetry, interactive request workbench, live cache store inspection, and simulated victim DOM rendering.
+
+### 7.3 Running the Interactive Terminal Simulation
 To execute the complete 4-phase simulation with colorized terminal telemetry:
 
 ```powershell
 python run_simulation.py
 ```
 
-### 7.3 Running the Automated Regression Test Suite
+### 7.4 Running the Automated Regression Test Suite
 To execute the automated Pytest test suite and verify individual security assertions:
+
+```powershell
+pytest tests/ -v
+```
 
 ```powershell
 pytest tests/test_cache_poisoning_sim.py -v

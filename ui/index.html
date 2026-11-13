@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Cache Poisoning Laboratory | Apex Global Financial</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32' fill='none'%3E%3Cpath d='M16 2L4 7v9c0 8.5 5.5 13.5 12 15 6.5-1.5 12-6.5 12-15V7L16 2z' fill='%230f172a' stroke='%232563eb' stroke-width='2'/%3E%3Crect x='9' y='10' width='14' height='4' rx='1' fill='%231e293b' stroke='%2338bdf8' stroke-width='1.5'/%3E%3Crect x='9' y='17' width='14' height='4' rx='1' fill='%231e293b' stroke='%2338bdf8' stroke-width='1.5'/%3E%3Ccircle cx='12' cy='12' r='1' fill='%2322c55e'/%3E%3Ccircle cx='12' cy='19' r='1' fill='%2322c55e'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- Header / Navigation -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="m9 12 2 2 4-4"/>
+      </svg>
+      <div class="brand-titles">
+        <span class="brand-name">Web Cache Poisoning Laboratory</span>
+        <span class="brand-subtitle">Scenario: Operation Canary Poison (Apex Global Financial)</span>
+      </div>
+    </div>
+
+    <!-- Cluster Status Indicators -->
+    <div class="cluster-status">
+      <div class="status-node" id="status-proxy">
+        <span class="status-indicator"></span>
+        <span class="node-label">Edge Proxy</span>
+        <span class="node-port">:8880</span>
+      </div>
+      <div class="status-node" id="status-upstream">
+        <span class="status-indicator"></span>
+        <span class="node-label">Upstream App</span>
+        <span class="node-port">:8881</span>
+      </div>
+      <div class="status-node" id="status-attacker">
+        <span class="status-indicator"></span>
+        <span class="node-label">Attacker Origin</span>
+        <span class="node-port">:8882</span>
+      </div>
+    </div>
+
+    <!-- Mode and Cache Controls -->
+    <div class="nav-actions">
+      <div class="mode-indicator" id="mode-badge">
+        <span class="mode-text">Mode: Vulnerable</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-toggle-mode">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="6" width="20" height="12" rx="2"/>
+          <circle cx="8" cy="12" r="2"/>
+        </svg>
+        <span>Toggle Hardening</span>
+      </button>
+      <button class="btn btn-danger" id="btn-purge-cache">
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+        <span>Purge Cache</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-layout">
+    <!-- Architecture Topology Row -->
+    <section class="section-card topology-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+            <line x1="6" y1="6" x2="6.01" y2="6"/>
+            <line x1="6" y1="18" x2="6.01" y2="18"/>
+          </svg>
+          <h2>System Topology & HTTP Traffic Pipeline</h2>
+        </div>
+        <div class="telemetry-bar">
+          <div class="metric-item">
+            <span class="metric-label">Cache Hits:</span>
+            <span class="metric-value" id="metric-hits">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Cache Misses:</span>
+            <span class="metric-value" id="metric-misses">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Active Keys:</span>
+            <span class="metric-value" id="metric-keys">0</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Default TTL:</span>
+            <span class="metric-value">30s</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topology-diagram">
+        <!-- Client Node -->
+        <div class="topology-node" id="node-client">
+          <div class="node-header">
+            <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            <span class="node-name">Client Layer</span>
+          </div>
+          <p class="node-desc">Innocent Traders (Alice, Bob, Charlie) and Attacker (Mallory)</p>
+          <div class="node-tag">HTTP Requests</div>
+        </div>
+
+        <div class="topology-arrow">
+          <span class="arrow-label">Port 8880</span>
+          <svg class="arrow-svg" viewBox="0 0 40 24">
+            <line x1="0" y1="12" x2="34" y2="12" stroke="currentColor" stroke-width="2"/>
+            <polygon points="32,7 40,12 32,17" fill="currentColor"/>
+          </svg>
+        </div>
+
+        <!-- Edge Proxy Node -->
+        <div class="topology-node highlight-proxy" id="node-proxy">
+          <div class="node-header">
+            <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+              <polyline points="2 17 12 22 22 17"/>
+              <polyline points="2 12 12 17 22 12"/>
+            </svg>
+            <span class="node-name">Edge Reverse Proxy</span>
+          </div>
+          <p class="node-desc">Cache Key: METHOD + Host + Path</p>
+          <div class="node-tag unkeyed-tag">Unkeyed: X-Forwarded-Host</div>
+        </div>
+
+        <div class="topology-arrow">
+          <span class="arrow-label">Cache Miss (Port 8881)</span>
+          <svg class="arrow-svg" viewBox="0 0 40 24">
+            <line x1="0" y1="12" x2="34" y2="12" stroke="currentColor" stroke-width="2"/>
+            <polygon points="32,7 40,12 32,17" fill="currentColor"/>
+          </svg>
+        </div>
+
+        <!-- Upstream Node -->
+        <div class="topology-node" id="node-upstream">
+          <div class="node-header">
+            <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+              <line x1="6" y1="6" x2="6.01" y2="6"/>
+              <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+            <span class="node-name">Upstream Application</span>
+          </div>
+          <p class="node-desc">Apex Banking Dashboard Microservice</p>
+          <div class="node-tag" id="upstream-mode-tag">Vulnerable: Dynamic Host</div>
+        </div>
+
+        <!-- Attacker External Origin -->
+        <div class="topology-node node-attacker-box" id="node-attacker">
+          <div class="node-header">
+            <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span class="node-name">Attacker Origin (:8882)</span>
+          </div>
+          <p class="node-desc">Hostile Canary Script (/static/app.js)</p>
+          <div class="node-tag tag-attacker">External Host</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two Column Workbench & Scenario Grid -->
+    <div class="grid-two-columns">
+      <!-- Left Column: Scenario Control & Execution Telemetry -->
+      <section class="section-card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <h2>Scenario Lifecycle (Operation Canary Poison)</h2>
+          </div>
+          <button class="btn btn-primary" id="btn-run-all">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+            <span>Execute All Phases</span>
+          </button>
+        </div>
+
+        <p class="section-description">
+          Execute each phase to observe the transition from normal edge caching to unkeyed header cache desynchronization, downstream victim compromise, and verified defense-in-depth remediation.
+        </p>
+
+        <!-- Phase Tabs / Buttons -->
+        <div class="phase-button-group">
+          <button class="btn btn-phase active" data-phase="1">
+            <span class="phase-number">Phase 1</span>
+            <span class="phase-title">Baseline Cache</span>
+          </button>
+          <button class="btn btn-phase" data-phase="2">
+            <span class="phase-number">Phase 2</span>
+            <span class="phase-title">Poisoning Strike</span>
+          </button>
+          <button class="btn btn-phase" data-phase="3">
+            <span class="phase-number">Phase 3</span>
+            <span class="phase-title">Victim Impact</span>
+          </button>
+          <button class="btn btn-phase" data-phase="4">
+            <span class="phase-number">Phase 4</span>
+            <span class="phase-title">Remediation</span>
+          </button>
+        </div>
+
+        <!-- Phase Context Card -->
+        <div class="phase-detail-box" id="phase-context-box">
+          <h3 id="phase-context-title">Phase 1: Baseline Traffic Analysis</h3>
+          <p id="phase-context-desc">
+            Innocent client Alice accesses the banking dashboard. The edge proxy checks the cache key, encounters a MISS, requests the asset from upstream, and stores the authentic response. Client Bob visits next and receives a clean Cache HIT.
+          </p>
+          <div class="phase-actions">
+            <button class="btn btn-primary" id="btn-run-current-phase">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+              <span>Execute Selected Phase</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Telemetry Log Output -->
+        <div class="log-container-header">
+          <span class="log-title">Transaction Audit Log</span>
+          <button class="btn-link" id="btn-clear-logs">Clear</button>
+        </div>
+        <div class="telemetry-log" id="telemetry-log-container">
+          <div class="log-empty-state">No transaction executed yet. Click "Execute Selected Phase" or "Execute All Phases" above.</div>
+        </div>
+      </section>
+
+      <!-- Right Column: Interactive Workbench & Request Inspector -->
+      <section class="section-card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+            <h2>Interactive Request Workbench</h2>
+          </div>
+          <span class="badge badge-info">Direct Edge Probe</span>
+        </div>
+
+        <p class="section-description">
+          Construct custom HTTP requests directed at the Edge Caching Proxy (:8880) to test cache key hashing, evaluate unkeyed header injection, or verify CSP headers.
+        </p>
+
+        <!-- Custom Request Form -->
+        <form class="workbench-form" id="workbench-form">
+          <div class="form-row">
+            <div class="form-group form-group-sm">
+              <label for="req-method">Method</label>
+              <select id="req-method" class="form-input">
+                <option value="GET">GET</option>
+                <option value="HEAD">HEAD</option>
+              </select>
+            </div>
+            <div class="form-group form-group-lg">
+              <label for="req-path">Path & Query</label>
+              <input type="text" id="req-path" class="form-input font-mono" value="/">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="req-headers">HTTP Headers (one per line, e.g., Header: Value)</label>
+            <textarea id="req-headers" class="form-input font-mono" rows="3" placeholder="X-Forwarded-Host: 127.0.0.1:8882"></textarea>
+          </div>
+
+          <div class="form-presets">
+            <span class="preset-label">Quick Presets:</span>
+            <button type="button" class="btn-preset" data-preset="clean">Normal Request</button>
+            <button type="button" class="btn-preset" data-preset="poison">X-Forwarded-Host Injection</button>
+            <button type="button" class="btn-preset" data-preset="cachebuster">Cache Buster Probe</button>
+          </div>
+
+          <div class="form-submit-row">
+            <button type="submit" class="btn btn-primary" id="btn-send-probe">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+              <span>Dispatch Request</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Probe Response Inspection Card -->
+        <div class="probe-result-box" id="probe-result-box">
+          <div class="result-header">
+            <span class="result-title">Response Analysis</span>
+            <span class="badge" id="probe-badge-cache">Cache: Pending</span>
+          </div>
+
+          <div class="result-meta-grid">
+            <div class="meta-cell">
+              <span class="meta-label">Status:</span>
+              <span class="meta-val" id="probe-res-status">-</span>
+            </div>
+            <div class="meta-cell">
+              <span class="meta-label">Latency:</span>
+              <span class="meta-val" id="probe-res-time">-</span>
+            </div>
+            <div class="meta-cell meta-span-2">
+              <span class="meta-label">Computed Cache Key:</span>
+              <span class="meta-val font-mono" id="probe-res-key">-</span>
+            </div>
+            <div class="meta-cell meta-span-2">
+              <span class="meta-label">Resolved &lt;script src&gt;:</span>
+              <span class="meta-val font-mono" id="probe-res-script">-</span>
+            </div>
+          </div>
+
+          <!-- Evaluation Alert -->
+          <div class="security-verdict" id="probe-verdict-box">
+            <span class="verdict-text" id="probe-verdict-text">Ready to dispatch probe.</span>
+          </div>
+
+          <!-- Raw Headers Toggle -->
+          <details class="raw-details">
+            <summary class="details-summary">View Response Headers & Body Snippet</summary>
+            <div class="raw-content font-mono" id="probe-raw-headers">Headers will appear here.</div>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <!-- Bottom Row: Cache State Inspector & Simulated Client View -->
+    <div class="grid-two-columns">
+      <!-- Cache Store Inspector -->
+      <section class="section-card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+            <h2>Edge Cache Store Inspector</h2>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-cache">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            <span>Refresh Table</span>
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="data-table" id="cache-table">
+            <thead>
+              <tr>
+                <th>Cache Key</th>
+                <th>Age</th>
+                <th>TTL</th>
+                <th>Size</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="cache-table-body">
+              <tr>
+                <td colspan="5" class="table-empty">Cache is currently empty. Dispatch requests to populate entries.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Simulated Victim DOM Preview -->
+      <section class="section-card">
+        <div class="card-header">
+          <div class="card-title">
+            <svg class="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            <h2>Simulated Client View (DOM Execution)</h2>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-view">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            <span>Simulate Victim Visit</span>
+          </button>
+        </div>
+
+        <p class="section-description">
+          Demonstrates how the cached HTTP response renders in an innocent user's browser, verifying whether the authentic application script or the attacker canary executed.
+        </p>
+
+        <!-- Simulated Browser Viewport -->
+        <div class="mock-browser">
+          <div class="browser-chrome">
+            <div class="browser-dots">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-amber"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <div class="browser-address-bar font-mono">
+              http://portal.apex-global-fin.internal:8880/
+            </div>
+          </div>
+          <div class="browser-content" id="browser-content-area">
+            <div class="mock-portal-card">
+              <h1 class="portal-title">SecureCorp Financial Dashboard</h1>
+              <p class="portal-status">Operational Status: Online</p>
+              <div class="portal-auth">Authenticated User Session: Active (Trader Desk 4)</div>
+              <div class="portal-script-audit" id="client-script-audit">
+                <span class="audit-label">Loaded Script:</span>
+                <span class="audit-value font-mono" id="client-script-val">Waiting for victim simulation...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
