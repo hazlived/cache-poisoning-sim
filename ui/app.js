@@ -1,7 +1,7 @@
 /**
  * Web Cache Poisoning Laboratory Client Application
  * Neo-Brutalist interactive console with live attack flow animations,
- * scenario stepping, interactive probes, and real-time telemetry.
+ * phase-by-phase visual simulation engine, and real-time telemetry.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -37,12 +37,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const elNodeAttacker = document.getElementById('node-attacker');
   const elArrowClientProxy = document.getElementById('arrow-client-proxy');
   const elArrowProxyUpstream = document.getElementById('arrow-proxy-upstream');
+  const elPacketTracer = document.getElementById('packet-tracer');
+  const elPacketText = document.getElementById('packet-text');
 
   // Scenario Stepper Elements
+  const elStepProgressBar = document.getElementById('step-progress-bar');
   const elPhaseButtons = document.querySelectorAll('.btn-phase');
   const elPhaseContextTitle = document.getElementById('phase-context-title');
   const elPhaseContextDesc = document.getElementById('phase-context-desc');
   const elBtnRunCurrentPhase = document.getElementById('btn-run-current-phase');
+  const elBtnAnimateCurrentPhase = document.getElementById('btn-animate-current-phase');
   const elBtnRunAll = document.getElementById('btn-run-all');
   const elTelemetryLog = document.getElementById('telemetry-log-container');
   const elBtnClearLogs = document.getElementById('btn-clear-logs');
@@ -67,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const elBtnRefreshView = document.getElementById('btn-refresh-view');
   const elBrowserContentArea = document.getElementById('browser-content-area');
   const elClientScriptVal = document.getElementById('client-script-val');
+  const elMockBrowser = document.querySelector('.mock-browser');
 
   // Phase Descriptions
   const phases = {
@@ -111,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Purge cache
     elBtnPurgeCache.addEventListener('click', purgeCache);
 
-    // Animation controls
+    // Top Animation controls
     elBtnPlayAnimation.addEventListener('click', playFullAttackAnimation);
     elBtnResetAnimation.addEventListener('click', resetAnimationFlow);
 
@@ -123,9 +128,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    // Run current phase
+    // Run current phase (direct execution)
     elBtnRunCurrentPhase.addEventListener('click', () => {
       runPhase(state.currentPhase);
+    });
+
+    // Animate current phase (visual animated walkthrough)
+    elBtnAnimateCurrentPhase.addEventListener('click', () => {
+      animatePhase(state.currentPhase);
     });
 
     // Run all phases
@@ -158,18 +168,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     elPhaseContextTitle.textContent = phases[phaseNum].title;
     elPhaseContextDesc.textContent = phases[phaseNum].desc;
+
+    // Update progress bar
+    if (elStepProgressBar) {
+      elStepProgressBar.className = 'step-progress-bar step-' + phaseNum;
+    }
   }
 
   // =========================================================================
-  // ANIMATION ENGINE: SIMULATES THE ATTACK FLOW ACROSS NODES
+  // ANIMATION ENGINE: FLOATING PACKETS & TOPOLOGY NODES
   // =========================================================================
 
   function clearNodeHighlights() {
     [elNodeClient, elNodeProxy, elNodeUpstream, elNodeAttacker].forEach((n) => {
-      n.classList.remove('active-packet', 'active-poison', 'active-safe');
+      n.classList.remove('active-packet', 'active-poison', 'active-safe', 'shield-active');
     });
     elArrowClientProxy.classList.remove('flow-active', 'flow-poison');
     elArrowProxyUpstream.classList.remove('flow-active', 'flow-poison');
+    hidePacket();
+  }
+
+  function showPacket(text, typeClass, posClass) {
+    elPacketText.textContent = text;
+    elPacketTracer.className = `packet-tracer-badge visible ${typeClass} ${posClass}`;
+  }
+
+  function hidePacket() {
+    elPacketTracer.className = 'packet-tracer-badge';
   }
 
   function resetAnimationFlow() {
@@ -178,66 +203,207 @@ document.addEventListener('DOMContentLoaded', () => {
     purgeCache();
   }
 
+  function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // =========================================================================
+  // DEDICATED PHASE ANIMATIONS (PHASE 1, 2, 3, 4)
+  // =========================================================================
+
+  async function animatePhase(phaseNum) {
+    if (state.isAnimating) return;
+    state.isAnimating = true;
+
+    // Visual button glow
+    const activeBtn = document.querySelector(`.btn-phase[data-phase="${phaseNum}"]`);
+    if (activeBtn) activeBtn.classList.add('animating');
+
+    try {
+      if (phaseNum === 1) {
+        await animatePhase1();
+      } else if (phaseNum === 2) {
+        await animatePhase2();
+      } else if (phaseNum === 3) {
+        await animatePhase3();
+      } else if (phaseNum === 4) {
+        await animatePhase4();
+      }
+    } finally {
+      if (activeBtn) activeBtn.classList.remove('animating');
+      state.isAnimating = false;
+    }
+  }
+
+  // Phase 1 Animation: Baseline Normal Traffic
+  async function animatePhase1() {
+    clearNodeHighlights();
+    elAnimationTicker.textContent = '[PHASE 1] Step 1: Alice requests GET / -> Edge Cache checks key -> MISS!';
+    showPacket('Alice: GET /', 'packet-type-clean', 'pos-client');
+    elNodeClient.classList.add('active-packet');
+    elArrowClientProxy.classList.add('flow-active');
+    await delay(700);
+
+    // Moves to Proxy
+    showPacket('Key = [GET:portal:8880:/]', 'packet-type-clean', 'pos-proxy');
+    elNodeClient.classList.remove('active-packet');
+    elNodeProxy.classList.add('active-packet');
+    await delay(700);
+
+    // Moves to Upstream
+    elAnimationTicker.textContent = '[PHASE 1] Step 2: Cache MISS forwarded to Upstream (:8881) -> Fetches authentic bundle.';
+    showPacket('Forwarding Upstream', 'packet-type-clean', 'pos-upstream');
+    elArrowProxyUpstream.classList.add('flow-active');
+    elNodeUpstream.classList.add('active-safe');
+    await delay(800);
+
+    // Returns to Proxy
+    elAnimationTicker.textContent = '[PHASE 1] Step 3: Upstream returns 200 OK. Edge Proxy caches authentic response (TTL: 30s).';
+    showPacket('200 OK (Authentic)', 'packet-type-clean', 'pos-proxy');
+    elNodeProxy.classList.add('active-safe');
+    await delay(800);
+
+    // Second client Bob visits
+    elAnimationTicker.textContent = '[PHASE 1] Step 4: Bob visits GET / -> Cache HIT! Served directly from Edge memory.';
+    showPacket('Bob: Cache HIT', 'packet-type-hit', 'pos-client');
+    await delay(700);
+
+    hidePacket();
+    await runPhase(1, true);
+    elAnimationTicker.textContent = '[PHASE 1 COMPLETE] Authentic responses cached and served from edge.';
+  }
+
+  // Phase 2 Animation: Unkeyed Header Injection & Cache Desynchronization
+  async function animatePhase2() {
+    clearNodeHighlights();
+    elAnimationTicker.textContent = '[PHASE 2] Step 1: Attacker Mallory injects unkeyed header X-Forwarded-Host: 127.0.0.1:8882';
+    elNodeClient.classList.add('active-poison');
+    elArrowClientProxy.classList.add('flow-poison');
+    showPacket('Mallory: Injected Header', 'packet-type-poison', 'pos-client');
+    await delay(800);
+
+    // Moves to Proxy
+    elAnimationTicker.textContent = '[PHASE 2] Step 2: Edge Proxy evaluates Cache Key [GET:portal:8880:/]. Unkeyed header IGNORED in key!';
+    showPacket('Key Omits X-Fwd-Host', 'packet-type-poison', 'pos-proxy');
+    elNodeClient.classList.remove('active-poison');
+    elNodeProxy.classList.add('active-packet');
+    await delay(900);
+
+    // Moves to Upstream
+    elAnimationTicker.textContent = '[PHASE 2] Step 3: Upstream reflects hostile host into HTML: <script src="http://127.0.0.1:8882/static/app.js">';
+    showPacket('Upstream Reflection', 'packet-type-poison', 'pos-upstream');
+    elArrowProxyUpstream.classList.add('flow-poison');
+    elNodeUpstream.classList.add('active-poison');
+    await delay(900);
+
+    // Returns to Proxy
+    showPacket('Poisoned HTML', 'packet-type-poison', 'pos-proxy');
+    elNodeUpstream.classList.remove('active-poison');
+    elNodeProxy.classList.add('active-poison');
+    elAnimationTicker.textContent = '[PHASE 2] Step 4: CRITICAL! Edge Proxy caches poisoned response under shared clean key!';
+    await delay(900);
+
+    hidePacket();
+    await runPhase(2, true);
+    elAnimationTicker.textContent = '[PHASE 2 COMPLETE] Cache poisoned! Next legitimate visitor will receive hostile payload.';
+  }
+
+  // Phase 3 Animation: Innocent Victim Compromise
+  async function animatePhase3() {
+    clearNodeHighlights();
+    elAnimationTicker.textContent = '[PHASE 3] Step 1: Innocent trader Charlie sends normal GET / (NO custom headers whatsoever).';
+    elNodeClient.classList.add('active-packet');
+    elArrowClientProxy.classList.add('flow-active');
+    showPacket('Charlie: Clean GET /', 'packet-type-clean', 'pos-client');
+    await delay(700);
+
+    // Moves to Proxy
+    elAnimationTicker.textContent = '[PHASE 3] Step 2: Edge Proxy matches clean key [GET:portal:8880:/] -> Cache HIT! Returning stored response.';
+    showPacket('Cache HIT (Poisoned)', 'packet-type-poison', 'pos-proxy');
+    elNodeProxy.classList.add('active-poison');
+    await delay(800);
+
+    // Returns to Client
+    showPacket('Hostile Asset Received', 'packet-type-poison', 'pos-client');
+    elNodeClient.classList.add('active-poison');
+    await delay(700);
+
+    // Jumps to Attacker Origin (:8882)
+    elAnimationTicker.textContent = '[PHASE 3] Step 3: Charlie\'s browser executes script from Attacker Origin (:8882)! Client-side compromise.';
+    showPacket('Fetching Script :8882', 'packet-type-poison', 'pos-attacker');
+    elNodeAttacker.classList.add('active-poison');
+    await delay(700);
+
+    // Tactile screen shake on simulated browser
+    if (elMockBrowser) {
+      elMockBrowser.classList.add('screen-shake');
+      setTimeout(() => elMockBrowser.classList.remove('screen-shake'), 600);
+    }
+
+    hidePacket();
+    await runPhase(3, true);
+    await simulateVictimView();
+    elAnimationTicker.textContent = '[PHASE 3 COMPLETE] Stored XSS executed in victim session. CVSS 8.6 impact demonstrated.';
+  }
+
+  // Phase 4 Animation: Defense-in-Depth Remediation
+  async function animatePhase4() {
+    clearNodeHighlights();
+    elAnimationTicker.textContent = '[PHASE 4] Step 1: Hardening deployed -> Edge Proxy activates barrier (header strip) & Upstream enforces CSP.';
+    elNodeProxy.classList.add('shield-active');
+    await delay(800);
+
+    // Attacker re-attempts
+    elAnimationTicker.textContent = '[PHASE 4] Step 2: Attacker re-attempts injection with X-Forwarded-Host: 127.0.0.1:8882';
+    elNodeClient.classList.add('active-poison');
+    elArrowClientProxy.classList.add('flow-poison');
+    showPacket('Attacker Injection', 'packet-type-poison', 'pos-client');
+    await delay(700);
+
+    // Hits Proxy Shield
+    showPacket('BLOCKED: Header Dropped', 'packet-type-blocked', 'pos-proxy');
+    elAnimationTicker.textContent = '[PHASE 4] Step 3: Edge Proxy strips untrusted header before upstream forwarding!';
+    await delay(800);
+
+    // Sanitized request to Upstream
+    showPacket('Canonical Asset + CSP', 'packet-type-clean', 'pos-upstream');
+    elNodeUpstream.classList.add('active-safe');
+    await delay(700);
+
+    // Innocent client David visits
+    elAnimationTicker.textContent = '[PHASE 4] Step 4: Client David visits -> Authentic asset served and protected by Content-Security-Policy.';
+    showPacket('David: Clean HIT', 'packet-type-clean', 'pos-client');
+    elNodeClient.classList.remove('active-poison');
+    elNodeClient.classList.add('active-safe');
+    await delay(700);
+
+    hidePacket();
+    await runPhase(4, true);
+    await simulateVictimView();
+    elAnimationTicker.textContent = '[PHASE 4 COMPLETE] System verified secure. Hostile inputs neutralized across all layers.';
+  }
+
+  // Play Full 5-Step Attack Sequence
   async function playFullAttackAnimation() {
     if (state.isAnimating) return;
     state.isAnimating = true;
     elBtnPlayAnimation.disabled = true;
 
     try {
-      // Step 1: Preparation & Cache Purge
-      elAnimationTicker.textContent = '[STEP 1/5] Purging Edge Proxy cache to simulate cache miss window...';
-      await purgeCache();
-      clearNodeHighlights();
-      await delay(800);
-
-      // Step 2: Attacker crafts unkeyed request
-      elNodeClient.classList.add('active-poison');
-      elAnimationTicker.textContent = '[STEP 2/5] Attacker Mallory dispatches HTTP GET / with header: X-Forwarded-Host: 127.0.0.1:8882';
-      elArrowClientProxy.classList.add('flow-poison');
-      await delay(1000);
-
-      // Step 3: Edge Proxy evaluates request key
-      elNodeClient.classList.remove('active-poison');
-      elNodeProxy.classList.add('active-packet');
-      elAnimationTicker.textContent = '[STEP 3/5] Edge Proxy computes Cache Key: [GET:portal:8880:/]. Unkeyed header ignored! Cache MISS. Forwarding upstream...';
-      elArrowProxyUpstream.classList.add('flow-poison');
+      selectPhase(2);
+      await animatePhase2();
       await delay(1200);
 
-      // Step 4: Upstream dynamically reflects the host
-      elNodeProxy.classList.remove('active-packet');
-      elNodeUpstream.classList.add('active-poison');
-      elAnimationTicker.textContent = '[STEP 4/5] Upstream App reflects attacker host into HTML: <script src="http://127.0.0.1:8882/static/app.js">';
+      selectPhase(3);
+      await animatePhase3();
       await delay(1200);
 
-      // Step 5: Poisoned response stored in Edge Cache under clean key
-      // Execute the actual Phase 2 request on backend
-      await runPhase(2, true);
-      elNodeUpstream.classList.remove('active-poison');
-      elNodeProxy.classList.add('active-poison');
-      elAnimationTicker.textContent = '[STEP 5/5] CRITICAL: Edge Proxy stores poisoned HTML under clean key! TTL: 30s. Now testing victim visit...';
-      await delay(1400);
-
-      // Step 6: Innocent victim Charlie visits
-      clearNodeHighlights();
-      elNodeClient.classList.add('active-packet');
-      elArrowClientProxy.classList.add('flow-active');
-      elAnimationTicker.textContent = '[EXPLOITATION] Innocent trader Charlie requests GET / with NO malicious headers. Proxy serves Cache HIT!';
-      await delay(1000);
-
-      // Step 7: Victim executes hostile canary script
-      await runPhase(3, true);
-      elNodeProxy.classList.add('active-poison');
-      elNodeAttacker.classList.add('active-poison');
-      elAnimationTicker.textContent = '[EXPLOIT SUCCESSFUL] Victim browser executed script from Attacker Origin (:8882). Staged XSS confirmed!';
-      await simulateVictimView();
+      selectPhase(4);
+      await animatePhase4();
     } finally {
       state.isAnimating = false;
       elBtnPlayAnimation.disabled = false;
     }
-  }
-
-  function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // =========================================================================
@@ -309,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Run Phase
+  // Run Phase Direct
   async function runPhase(phaseNum, silent = false) {
     if (!silent) {
       elBtnRunCurrentPhase.disabled = true;

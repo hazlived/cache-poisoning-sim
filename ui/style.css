@@ -580,8 +580,7 @@ body {
 .packet-tracer-badge {
   display: none;
   position: absolute;
-  top: 12px;
-  left: 20px;
+  top: 14px;
   background-color: #111111;
   color: #ffffff;
   border: var(--border-medium);
@@ -589,11 +588,133 @@ body {
   border-radius: var(--radius-sharp);
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 700;
-  box-shadow: 2px 2px 0px #ffffff;
-  z-index: 10;
+  font-weight: 800;
+  box-shadow: 3px 3px 0px #111111;
+  z-index: 20;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  white-space: nowrap;
 }
+
+.packet-tracer-badge.visible {
+  display: block;
+}
+
+.packet-tracer-badge.pos-client {
+  left: 10%;
+  transform: translateX(-50%);
+}
+
+.packet-tracer-badge.pos-proxy {
+  left: 38%;
+  transform: translateX(-50%);
+}
+
+.packet-tracer-badge.pos-upstream {
+  left: 70%;
+  transform: translateX(-50%);
+}
+
+.packet-tracer-badge.pos-attacker {
+  left: 90%;
+  transform: translateX(-50%);
+}
+
+/* Distinct packet badge styles */
+.packet-type-clean {
+  background-color: var(--accent-green) !important;
+  color: #ffffff !important;
+}
+
+.packet-type-poison {
+  background-color: var(--accent-red) !important;
+  color: #ffffff !important;
+  animation: packetPulse 0.4s ease infinite alternate;
+}
+
+.packet-type-blocked {
+  background-color: var(--accent-blue) !important;
+  color: #ffffff !important;
+}
+
+.packet-type-hit {
+  background-color: var(--accent-yellow) !important;
+  color: #111111 !important;
+}
+
+@keyframes packetPulse {
+  from { transform: translateX(-50%) scale(1); }
+  to { transform: translateX(-50%) scale(1.08); }
+}
+
+/* Shield barrier animation on Edge Proxy node */
+.topology-node.shield-active {
+  border-color: var(--accent-blue) !important;
+  box-shadow: 6px 6px 0px var(--accent-blue) !important;
+  background-color: var(--accent-blue-light) !important;
+}
+
+.topology-node.shield-active::after {
+  content: "[SHIELD: STRIPPING UNKEYED HEADERS]";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--accent-blue);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border: 1.5px solid #111111;
+  border-radius: var(--radius-sharp);
+  white-space: nowrap;
+}
+
+/* Tactile screen shake animation on browser viewport */
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+.mock-browser.screen-shake {
+  animation: screenShake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  border-color: var(--accent-red) !important;
+}
+
+/* Phase Stepper Active Glow Animation */
+.btn-phase.animating {
+  animation: phaseGlow 0.5s ease infinite alternate;
+}
+
+@keyframes phaseGlow {
+  from { box-shadow: 3px 3px 0px #111111; }
+  to { box-shadow: 5px 5px 0px var(--accent-blue); }
+}
+
+/* Phase Stepper Progress Indicator */
+.phase-stepper-progress {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-card-alt);
+  border: var(--border-thin);
+  border-radius: var(--radius-sharp);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.step-progress-bar {
+  height: 100%;
+  width: 25%;
+  background-color: var(--accent-blue);
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.step-progress-bar.step-1 { width: 25%; background-color: var(--accent-green); }
+.step-progress-bar.step-2 { width: 50%; background-color: var(--accent-red); }
+.step-progress-bar.step-3 { width: 75%; background-color: var(--accent-red); }
+.step-progress-bar.step-4 { width: 100%; background-color: var(--accent-green); }
 
 /* ==========================================================================
    SCENARIO CONTROLLER & STEPPER
