@@ -261,18 +261,12 @@
           <p id="phase-context-desc">
             Innocent client Alice accesses the banking dashboard. The edge proxy checks the cache key, encounters a MISS, requests the asset from upstream, and stores the authentic response. Client Bob visits next and receives a clean Cache HIT.
           </p>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <div>
             <button class="btn btn-primary" id="btn-run-current-phase">
               <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polyline points="9 18 15 12 9 6"/>
               </svg>
               <span>Execute Selected Phase</span>
-            </button>
-            <button class="btn btn-warning" id="btn-animate-current-phase">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <polygon points="5 3 19 12 5 21 5 3"/>
-              </svg>
-              <span>Animate Phase</span>
             </button>
           </div>
         </div>
